@@ -50,6 +50,7 @@ GNDVOID_NAME = 'GNDVOID.DBF'
 PAY_RATE = 10000
 CUR_RATE = 20000
 RSN_RATE = 30000
+REFUND_RATE = 40000
 # EXP
 EXP_NAME = 'exp.dbf'
 EXPCATEG_NAME = 'Expcateg.dbf'
@@ -110,7 +111,7 @@ def get_data(name: str):
             deleted = '0'
             t = (extcode, name, deleted)
             cmp_tl.append(t)  #
-    # ------------------ DEL REASONS ----------------------------------------------------------- #
+        # ------------------ DEL REASONS ----------------------------------------------------------- #
         rsn = DBF.read_dbf(log=LOG_NAME, file_path=DICTS_PATH, file_name=RSN_NAME)
         rsn_tl = []
         for l in rsn:
@@ -120,7 +121,18 @@ def get_data(name: str):
             t = (extcode, name, deleted)
             rsn_tl.append(t)  #
 
-        expcateg_tl = pay_tl + cur_tl + cmp_tl + rsn_tl
+        # REFUND -------------------------------------------------------------- #
+        rfnd_code = INI.get(log=LOG_NAME, ini=INI_NAME, section='REFUND', param='code')
+        rfnd_name = INI.get(log=LOG_NAME, ini=INI_NAME, section='REFUND', param='name')
+
+        # result
+        if len(rfnd_code) > 0 and rfnd_code.isnumeric():
+            rfnd_tl = [(str(int(rfnd_code) + REFUND_RATE), f'rfnd:{rfnd_name}', '0')]
+            expcateg_tl = pay_tl + cur_tl + cmp_tl + rsn_tl + rfnd_tl
+        else:
+            expcateg_tl = pay_tl + cur_tl + cmp_tl + rsn_tl
+
+        # expcateg_tl = pay_tl + cur_tl + cmp_tl + rsn_tl
         # [('10098', 'pay:CASH', '0'), ... ('20020', 'cur:Кред.Карта', '0'), ... ('30006', 'rsn:Б/С Менеджер', '0')]
 
         if param == 'ptree':
@@ -304,7 +316,7 @@ def get_data(name: str):
         # [[20001, datetime.date(2022, 4, 5), 2900, 1.0, 380.0, 380.0, 1, 20, 61, 'Ролл с лососем 200 гр', 10099],
         # ------------------------------------ EXP ITEMS TL ------------------------------------- #
         # # [check, date, item, quantity, price, discprice, categ, cur, sunit, name, pay_type]
-        tl1 = []
+        tl0 = []
         for l in items2:
             logicdate = l[1]
             sunits_ref = str(l[8])
@@ -318,23 +330,50 @@ def get_data(name: str):
 
             ecaption_ref = None
             qnt = l[3]
-            if TOTALS == '1': total0 = l[5]  # with discs / markups
-            elif TOTALS == '2': total0 = l[6]  # without
-            else: total0 = l[5]  # with
+            if TOTALS == '1': total = l[5]  # with discs / markups
+            elif TOTALS == '2': total = l[6]  # without
+            else: total = l[5]  # with
 
-            # обработка отрицательной цены (при возвратах)
-            if total0 < 0:
-                total = 0
-            else:
-                total = total0
+            # # обработка отрицательной цены (при возвратах)
+            # if total0 < 0:
+            #     total = 0
+            # else:
+            #     total = total0
 
             gabbr_text = ""
             gabbr_num = str(l[2])
             gname = l[9]
             t = (logicdate, sunits_ref, goods_ref, pgoods_ref, ecateg_ref, ecaption_ref, qnt, total,
                  gabbr_text, gabbr_num, gname)
-            tl1.append(t)
+            tl0.append(t)
             # [(datetime.date(2022, 4, 5), '61', 2900, None, 20020, None, 1.0, 380.0, '', '2900', 'Ролл с лососем 200
+
+        # REFUNDS ------------------------------------------------------------------------------- #
+        rfnd_ini_code = INI.get(log=LOG_NAME, ini=INI_NAME, section='REFUND', param='code')
+
+        if len(rfnd_ini_code) > 0 and rfnd_ini_code.isnumeric():
+            for t in tl0:
+                total0 = t[7]
+                if total0 < 0:
+                    to_ins = (
+                    t[0], t[1], t[2], t[3], int(rfnd_ini_code) + REFUND_RATE, t[5], t[6], abs(t[7]), t[8], t[9], t[10])
+                    for_del = (t[0], t[1], t[2], t[3], t[4], t[5], t[6], abs(t[7]), t[8], t[9], t[10])
+                    tl0.remove(t)
+                    tl0.remove(for_del)
+                    tl0.append(to_ins)
+
+        elif len(rfnd_ini_code) == 0 or not rfnd_ini_code.isnumeric():
+            for t in tl0:
+                total0 = t[7]
+                if total0 < 0:
+                    for_del = (t[0], t[1], t[2], t[3], t[4], t[5], t[6], abs(t[7]), t[8], t[9], t[10])
+                    tl0.remove(t)
+                    tl0.remove(for_del)
+                    # [(datetime.date(2022, 4, 5), '62', 1803, None, 20001, None, 1.0, -100.0, '', '1803', 'Круассан')]
+
+        tl1 = tl0
+
+
         # ------------------------------------- VOIDS TL  ------------------------------------------- #
         voids = shifts(start=START, stop=STOP, param=GNDVOID_NAME)
         # [[20604, datetime.date(2022, 4, 5), 1806, 130.0, 5], ... reason]
@@ -610,6 +649,7 @@ def get_data(name: str):
         return sunits_json
 
     def sh5_odocs():
+
         """ Returns odocs.json """
 
         exp_tl = exp()
