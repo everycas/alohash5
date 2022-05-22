@@ -472,6 +472,7 @@ def get_data(name: str):
         return guid  # make
 
     def sh5_corrs():
+
         """ Returns spec_corrs.json """
 
         # ---------------------- PAYS & PTREE -------------------------------------------------------- #
@@ -528,6 +529,7 @@ def get_data(name: str):
         return corrs_json
 
     def sh5_ggroups():
+
         """ Returns ggroups.json """
 
         ini_names = INI.get(log=LOG_NAME, ini=INI_NAME, section='GTREE', param='names').split(", ")  # list
