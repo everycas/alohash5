@@ -312,7 +312,7 @@ def get_data(name: str):
                 if str(l[7]) in curs:
                     l.append(pay)
                     items2.append(l)
-        # print(items2)
+
         # [[20001, datetime.date(2022, 4, 5), 2900, 1.0, 380.0, 380.0, 1, 20, 61, 'Ролл с лососем 200 гр', 10099],
         # ------------------------------------ EXP ITEMS TL ------------------------------------- #
         # # [check, date, item, quantity, price, discprice, categ, cur, sunit, name, pay_type]
